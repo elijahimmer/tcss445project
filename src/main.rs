@@ -7,6 +7,8 @@ use sqlite::DatabasePlugin;
 pub mod prelude {
     pub use bevy::prelude::*;
 
+    pub use crate::sqlite::*;
+
     #[cfg(feature = "debug")]
     pub use bevy::dev_tools::states::log_transitions;
 }

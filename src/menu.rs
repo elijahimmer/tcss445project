@@ -59,6 +59,15 @@ pub enum MenuState {
 #[derive(Component)]
 struct SelectedOption;
 
+#[derive(Component)]
+struct MotherPokemonInput;
+
+#[derive(Component)]
+struct OtherPokemonInput;
+
+#[derive(Component)]
+struct ResultLabel;
+
 fn main_enter(mut commands: Commands, font: Res<GameFont>) {
     // Common style for all buttons on the screen
     let button_node = Node {
@@ -120,6 +129,7 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                             max_chars: Some(32),
                             ..default()
                         },
+                        MotherPokemonInput,
                         button_text_style.clone(),
                     ));
 
@@ -144,19 +154,34 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                             max_chars: Some(32),
                             ..default()
                         },
+                        OtherPokemonInput,
                         button_text_style.clone(),
                     ));
 
                     builder.spawn((
-                        Button,
-                        button_node.clone(),
-                        BackgroundColor(BUTTON_COLOR),
-                        children![(
-                            button_text_style.clone(),
-                            Text::new("Submit"),
-                            Pickable::IGNORE
-                        ),],
+                        button_text_style.clone(),
+                        Text::new("Result:"),
+                        Pickable::IGNORE,
                     ));
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new(""),
+                        Pickable::IGNORE,
+                        ResultLabel,
+                    ));
+
+                    builder
+                        .spawn((
+                            Button,
+                            button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
+                            children![(
+                                button_text_style.clone(),
+                                Text::new("Submit"),
+                                Pickable::IGNORE
+                            ),],
+                        ))
+                        .observe(submit_button);
 
                     builder
                         .spawn((
@@ -195,4 +220,67 @@ fn quit_game_on_click(
     if click.button == PointerButton::Primary {
         app_exit_events.write(AppExit::Success);
     }
+}
+
+fn submit_button(
+    mut click: Trigger<Pointer<Click>>,
+    mother: Query<&TextInputContents, With<MotherPokemonInput>>,
+    other: Query<&TextInputContents, With<OtherPokemonInput>>,
+    mut result: Query<&mut Text, With<ResultLabel>>,
+    db: NonSend<Database>,
+) {
+    click.propagate(false);
+
+    if click.button == PointerButton::Primary {
+        let mother = mother.single().unwrap().get();
+        let other = other.single().unwrap().get();
+        let mut result = result.single_mut().unwrap();
+
+        if !exists(&db, mother) {
+            result.0 = "Mother Pokemon not found!".into();
+            return;
+        }
+
+        if !exists(&db, other) {
+            result.0 = "Other Pokemon not found!".into();
+            return;
+        }
+
+        let mother_groups = get_groups(&db, mother);
+        let other_groups = get_groups(&db, other);
+
+        let any_overlap = mother_groups
+            .iter()
+            .any(|g| other_groups.iter().any(|y| y == g));
+
+        result.0 = if any_overlap { mother } else { "Bad Match!" }.into();
+    }
+}
+
+fn exists(db: &Database, name: &str) -> bool {
+    let query = r#"
+            SELECT COUNT(*)
+                FROM pokemon
+                WHERE pokemon.name = :name
+        "#;
+    let mut query = db.connection.prepare_cached(query).unwrap();
+
+    query.query_one((name,), |a| a.get::<_, u32>(0)).unwrap() > 0
+}
+
+fn get_groups(db: &Database, name: &str) -> Vec<String> {
+    let query = r#"
+            SELECT egg_group.name
+                FROM pokemon
+                    JOIN pokemon_egg_group ON pokemon.pokemon_id = pokemon_egg_group.pokemon_id
+                    JOIN egg_group ON pokemon_egg_group.egg_group_id = egg_group.egg_group_id
+                WHERE pokemon.name = :pokemon_name;
+        "#;
+    let mut query = db.connection.prepare_cached(query).unwrap();
+
+    query
+        .query_map((name,), |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
 }
