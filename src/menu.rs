@@ -37,7 +37,6 @@ fn camera_setup(mut commands: Commands) {
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scaling_mode: bevy::render::camera::ScalingMode::WindowSize,
-            scale: CAMERA_DEFAULT_SCALE,
             ..OrthographicProjection::default_2d()
         }),
         Transform::IDENTITY,
