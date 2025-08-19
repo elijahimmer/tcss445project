@@ -1,0 +1,79 @@
+[package]
+name = "tcss445project"
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+repository = "https://github.com/elijahimmer/tcss445project"
+license = "Apache-2.0"
+
+[dependencies]
+# TODO: Update accesskit when bevy does.
+accesskit = { version = "0.18", features = ["enumn", "serde"] }
+bevy_ecs_tilemap = { version = "0.16", features = ["atlas"] }
+bevy_ui_text_input = "0.5"
+rusqlite = { version = "0.37.0", features = ["modern_sqlite", "bundled", "rusqlite-macros"] }
+strum = { version = "0.27", features = ["derive", "phf"] }
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+const_format = "0.2.34"
+thiserror = "2.0.15"
+serde = { version = "1.0.219", features = ["derive"] }
+
+[dependencies.bevy]
+version = "0.16"
+default-features = false
+features = [
+  # Uncomment and add more as needed.
+  #"animation",
+  "async_executor",
+  "bevy_asset",
+  "bevy_audio",
+  #"bevy_color",
+  "bevy_core_pipeline",
+  "bevy_gilrs",
+  #"bevy_gizmos",
+  #"bevy_gltf",
+  #"bevy_input_focus",
+  "bevy_log",
+  #"bevy_mesh_picking_backend",
+  #"bevy_pbr",
+  "bevy_picking",
+  "bevy_render",
+  #"bevy_scene",
+  "bevy_sprite",
+  "bevy_sprite_picking_backend",
+  "bevy_state",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_ui_picking_backend",
+  "bevy_window",
+  "bevy_winit",
+  #"custom_cursor",
+  "default_font",
+  #"hdr",
+  "multi_threaded",
+  "png",
+  #"smaa_luts",
+  "std",
+  "serialize",
+  "sysinfo_plugin",
+  #"tonemapping_luts",
+  #"vorbis",
+  # "webgl2",
+  "x11",
+]
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[features]
+debug = [
+  "bevy/bevy_dev_tools",
+  "bevy/debug_glam_assert",
+]
+dev = [
+  "bevy/dynamic_linking",
+  "bevy/file_watcher",
+]
