@@ -63,7 +63,13 @@ struct SelectedOption;
 struct MotherPokemonInput;
 
 #[derive(Component)]
+struct MotherPokemonInfo;
+
+#[derive(Component)]
 struct OtherPokemonInput;
+
+#[derive(Component)]
+struct OtherPokemonInfo;
 
 #[derive(Component)]
 struct ResultLabel;
@@ -132,6 +138,12 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                         MotherPokemonInput,
                         button_text_style.clone(),
                     ));
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new(""),
+                        Pickable::IGNORE,
+                        MotherPokemonInfo,
+                    ));
 
                     builder.spawn((
                         button_text_style.clone(),
@@ -156,6 +168,12 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                         },
                         OtherPokemonInput,
                         button_text_style.clone(),
+                    ));
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new(""),
+                        Pickable::IGNORE,
+                        OtherPokemonInfo,
                     ));
 
                     builder.spawn((
@@ -226,6 +244,22 @@ fn submit_button(
     mut click: Trigger<Pointer<Click>>,
     mother: Query<&TextInputContents, With<MotherPokemonInput>>,
     other: Query<&TextInputContents, With<OtherPokemonInput>>,
+    mut mother_info: Query<
+        &mut Text,
+        (
+            With<MotherPokemonInfo>,
+            Without<ResultLabel>,
+            Without<OtherPokemonInfo>,
+        ),
+    >,
+    mut other_info: Query<
+        &mut Text,
+        (
+            With<OtherPokemonInfo>,
+            Without<ResultLabel>,
+            Without<MotherPokemonInfo>,
+        ),
+    >,
     mut result: Query<&mut Text, With<ResultLabel>>,
     db: NonSend<Database>,
 ) {
@@ -234,26 +268,47 @@ fn submit_button(
     if click.button == PointerButton::Primary {
         let mother = mother.single().unwrap().get();
         let other = other.single().unwrap().get();
-        let mut result = result.single_mut().unwrap();
-
-        if !exists(&db, mother) {
-            result.0 = "Mother Pokemon not found!".into();
-            return;
-        }
-
-        if !exists(&db, other) {
-            result.0 = "Other Pokemon not found!".into();
-            return;
-        }
 
         let mother_groups = get_groups(&db, mother);
         let other_groups = get_groups(&db, other);
+
+        let mut result = result.single_mut().unwrap();
+
+        let mut mother_info = mother_info.single_mut().unwrap();
+
+        mother_info.0 = if !exists(&db, mother) {
+            "Not Found".into()
+        } else {
+            format!("Egg Groups: {}", mother_groups.join(", "))
+        };
+
+        let mut other_info = other_info.single_mut().unwrap();
+
+        other_info.0 = if !exists(&db, other) {
+            "Not Found".into()
+        } else {
+            format!("Egg Groups: {}", other_groups.join(", "))
+        };
 
         let any_overlap = mother_groups
             .iter()
             .any(|g| other_groups.iter().any(|y| y == g));
 
-        result.0 = if any_overlap { mother } else { "Bad Match!" }.into();
+        if !any_overlap {
+            result.0 = "Bad Match!".into();
+        } else {
+            let pokemon = if mother == "Ditto" { other } else { mother };
+
+            let egg_moves = get_egg_moves(&db, pokemon);
+
+            let msg = if egg_moves.len() > 0 {
+                egg_moves.join(", ")
+            } else {
+                "No Egg Moves".into()
+            };
+
+            result.0 = format!("{pokemon}\n{msg}");
+        };
     }
 }
 
@@ -276,6 +331,23 @@ fn get_groups(db: &Database, name: &str) -> Vec<String> {
                     JOIN egg_group ON pokemon_egg_group.egg_group_id = egg_group.egg_group_id
                 WHERE pokemon.name = :pokemon_name;
         "#;
+    let mut query = db.connection.prepare_cached(query).unwrap();
+
+    query
+        .query_map((name,), |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+fn get_egg_moves(db: &Database, name: &str) -> Vec<String> {
+    let query = r#"
+        SELECT move.name
+            FROM pokemon
+                JOIN pokemon_move ON pokemon.pokemon_id = pokemon_move.pokemon_id
+                JOIN move ON pokemon_move.move_id = move.move_id
+            WHERE pokemon.name = :pokemon_name
+    "#;
     let mut query = db.connection.prepare_cached(query).unwrap();
 
     query
