@@ -1,10 +1,14 @@
 use crate::embed_asset;
 use crate::prelude::*;
 
-use bevy_ui_text_input::{TextInputContents, TextInputFilter, TextInputMode, TextInputNode};
+use bevy_ui_text_input::{TextInputContents, TextInputMode, TextInputNode};
 
 const DEFAULT_FONT_PATH: &str = "embedded://assets/fonts/Ithaca/Ithaca-LVB75.ttf";
 const TEXT_COLOR: Color = Color::srgb_u8(0xFF, 0xFF, 0xFF);
+const TEXT_INPUT_COLOR: Color = Color::srgb_u8(0x33, 0x55, 0x33);
+const BUTTON_COLOR: Color = Color::srgb_u8(0x33, 0x55, 0x77);
+const HOVERED_BUTTON_COLOR: Color = Color::srgb_u8(0x77, 0x55, 0x33);
+const PRESSED_BUTTON_COLOR: Color = Color::srgb_u8(0x00, 0x00, 0x00);
 
 pub struct MenuPlugin;
 
@@ -13,6 +17,7 @@ impl Plugin for MenuPlugin {
         embed_asset!(app, "assets/fonts/Ithaca/Ithaca-LVB75.ttf");
 
         app.init_state::<MenuState>();
+        app.add_plugins(bevy_ui_text_input::TextInputPlugin);
 
         #[cfg(feature = "debug")]
         app.add_systems(Update, log_transitions::<MenuState>);
@@ -95,28 +100,69 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                 })
                 .with_children(|builder| {
                     builder.spawn((
+                        button_text_style.clone(),
+                        Text::new("Mother Pokemon"),
+                        Pickable::IGNORE,
+                    ));
+                    builder.spawn((
                         Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
+                            width: Val::Px(500.0),
+                            height: Val::Px(60.0),
                             ..default()
                         },
                         TextInputContents::default(),
+                        BackgroundColor(TEXT_INPUT_COLOR),
                         TextInputNode {
                             clear_on_submit: false,
                             mode: TextInputMode::SingleLine,
                             focus_on_pointer_down: true,
                             unfocus_on_submit: true,
-                            max_chars: Some(16),
-                            filter: Some(TextInputFilter::Hex),
+                            max_chars: Some(32),
                             ..default()
                         },
                         button_text_style.clone(),
+                    ));
+
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new("Other Pokemon"),
+                        Pickable::IGNORE,
+                    ));
+                    builder.spawn((
+                        Node {
+                            width: Val::Px(500.0),
+                            height: Val::Px(60.0),
+                            ..default()
+                        },
+                        TextInputContents::default(),
+                        BackgroundColor(TEXT_INPUT_COLOR),
+                        TextInputNode {
+                            clear_on_submit: false,
+                            mode: TextInputMode::SingleLine,
+                            focus_on_pointer_down: true,
+                            unfocus_on_submit: true,
+                            max_chars: Some(32),
+                            ..default()
+                        },
+                        button_text_style.clone(),
+                    ));
+
+                    builder.spawn((
+                        Button,
+                        button_node.clone(),
+                        BackgroundColor(BUTTON_COLOR),
+                        children![(
+                            button_text_style.clone(),
+                            Text::new("Submit"),
+                            Pickable::IGNORE
+                        ),],
                     ));
 
                     builder
                         .spawn((
                             Button,
                             button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
                             children![(button_text_style, Text::new("Quit"), Pickable::IGNORE),],
                         ))
                         .observe(quit_game_on_click);
@@ -130,16 +176,14 @@ fn button_highlight(
         (Changed<Interaction>, With<Button>),
     >,
 ) {
-    // for (interaction, mut background_color, selected) in &mut interaction_query {
-    //     *background_color = match (*interaction, selected) {
-    //         (Interaction::Pressed, _) | (Interaction::None, Some(_)) => {
-    //             PRESSED_BUTTON_COLOR.into()
-    //         }
-    //         (Interaction::Hovered, Some(_)) => style.hovered_pressed_button_color.into(),
-    //         (Interaction::Hovered, Option::None) => style.hovered_button_color.into(),
-    //         (Interaction::None, Option::None) => style.button_color.into(),
-    //     }
-    // }
+    for (interaction, mut background_color, selected) in &mut interaction_query {
+        *background_color = match (*interaction, selected) {
+            (Interaction::Pressed, _) | (Interaction::None, Some(_)) => PRESSED_BUTTON_COLOR.into(),
+            (Interaction::Hovered, Some(_)) => HOVERED_BUTTON_COLOR.into(),
+            (Interaction::Hovered, Option::None) => HOVERED_BUTTON_COLOR.into(),
+            (Interaction::None, Option::None) => BUTTON_COLOR.into(),
+        }
+    }
 }
 
 fn quit_game_on_click(
