@@ -1,6 +1,9 @@
 use crate::embed_asset;
 use crate::prelude::*;
 
+use bevy::ecs::schedule::ScheduleConfigs;
+use bevy::ecs::system::ScheduleSystem;
+use bevy::state::state::FreelyMutableState;
 use bevy_ui_text_input::{TextInputContents, TextInputMode, TextInputNode};
 
 const DEFAULT_FONT_PATH: &str = "embedded://assets/fonts/Ithaca/Ithaca-LVB75.ttf";
@@ -22,16 +25,26 @@ impl Plugin for MenuPlugin {
         #[cfg(feature = "debug")]
         app.add_systems(Update, log_transitions::<MenuState>);
 
-        app.add_systems(
-            OnEnter(MenuState::Main),
-            ((load_font, camera_setup), main_enter).chain(),
-        )
-        .add_systems(Update, button_highlight);
+        app.add_systems(Startup, (load_font, camera_setup))
+            .add_systems(
+                Update,
+                change_state(MenuState::Main).run_if(in_state(MenuState::Loading)),
+            )
+            .add_systems(OnEnter(MenuState::Main), main_enter)
+            .add_systems(OnEnter(MenuState::Breed), breed_enter)
+            .add_systems(OnEnter(MenuState::Search), search_enter)
+            .add_systems(Update, button_highlight);
     }
 }
 
 #[derive(Resource)]
 pub struct GameFont(pub Handle<Font>);
+
+pub fn change_state<State: FreelyMutableState + Clone>(
+    state: State,
+) -> ScheduleConfigs<ScheduleSystem> {
+    (move |mut next_state: ResMut<NextState<State>>| next_state.set(state.clone())).into_configs()
+}
 
 fn load_font(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     commands.insert_resource(GameFont(asset_server.load(DEFAULT_FONT_PATH)));
@@ -52,7 +65,10 @@ fn camera_setup(mut commands: Commands) {
 #[states(scoped_entities)]
 pub enum MenuState {
     #[default]
+    Loading,
     Main,
+    Breed,
+    Search,
 }
 
 /// Tag component used to mark which setting is currently selected
@@ -75,7 +91,6 @@ struct OtherPokemonInfo;
 struct ResultLabel;
 
 fn main_enter(mut commands: Commands, font: Res<GameFont>) {
-    // Common style for all buttons on the screen
     let button_node = Node {
         width: Val::Px(300.0),
         height: Val::Px(65.0),
@@ -105,6 +120,100 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                 ..default()
             },
             StateScoped(MenuState::Main),
+        ))
+        .with_children(|builder| {
+            builder
+                .spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|builder| {
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new("Pokemon Database"),
+                        Pickable::IGNORE,
+                    ));
+
+                    builder
+                        .spawn((
+                            Button,
+                            button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
+                            children![(
+                                button_text_style.clone(),
+                                Text::new("Breed"),
+                                Pickable::IGNORE
+                            ),],
+                        ))
+                        .observe(change_state_on_click(
+                            PointerButton::Primary,
+                            MenuState::Breed,
+                        ));
+
+                    builder
+                        .spawn((
+                            Button,
+                            button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
+                            children![(
+                                button_text_style.clone(),
+                                Text::new("Search"),
+                                Pickable::IGNORE
+                            ),],
+                        ))
+                        .observe(change_state_on_click(
+                            PointerButton::Primary,
+                            MenuState::Search,
+                        ));
+
+                    builder
+                        .spawn((
+                            Button,
+                            button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
+                            children![(
+                                button_text_style.clone(),
+                                Text::new("Quit"),
+                                Pickable::IGNORE
+                            ),],
+                        ))
+                        .observe(quit_game_on_click);
+                });
+        });
+}
+
+fn breed_enter(mut commands: Commands, font: Res<GameFont>) {
+    // Common style for all buttons on the screen
+    let button_node = Node {
+        width: Val::Px(300.0),
+        height: Val::Px(65.0),
+        margin: UiRect::all(Val::Px(15.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+
+    let button_text_style = (
+        TextFont {
+            font: font.0.clone(),
+            font_size: 33.0,
+            ..default()
+        },
+        TextColor(TEXT_COLOR),
+        TextLayout::new_with_justify(JustifyText::Center),
+    );
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            StateScoped(MenuState::Breed),
         ))
         .with_children(|builder| {
             builder
@@ -199,16 +308,122 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                                 Pickable::IGNORE
                             ),],
                         ))
-                        .observe(submit_button);
+                        .observe(breed_submit_button);
 
                     builder
                         .spawn((
                             Button,
                             button_node.clone(),
                             BackgroundColor(BUTTON_COLOR),
-                            children![(button_text_style, Text::new("Quit"), Pickable::IGNORE),],
+                            children![(button_text_style, Text::new("Back"), Pickable::IGNORE),],
                         ))
-                        .observe(quit_game_on_click);
+                        .observe(change_state_on_click(
+                            PointerButton::Primary,
+                            MenuState::Main,
+                        ));
+                });
+        });
+}
+fn search_enter(mut commands: Commands, font: Res<GameFont>) {
+    // Common style for all buttons on the screen
+    let button_node = Node {
+        width: Val::Px(300.0),
+        height: Val::Px(65.0),
+        margin: UiRect::all(Val::Px(15.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+
+    let button_text_style = (
+        TextFont {
+            font: font.0.clone(),
+            font_size: 33.0,
+            ..default()
+        },
+        TextColor(TEXT_COLOR),
+        TextLayout::new_with_justify(JustifyText::Center),
+    );
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            StateScoped(MenuState::Search),
+        ))
+        .with_children(|builder| {
+            builder
+                .spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|builder| {
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new("Pokemon"),
+                        Pickable::IGNORE,
+                    ));
+                    builder.spawn((
+                        Node {
+                            width: Val::Px(500.0),
+                            height: Val::Px(60.0),
+                            ..default()
+                        },
+                        TextInputContents::default(),
+                        BackgroundColor(TEXT_INPUT_COLOR),
+                        TextInputNode {
+                            clear_on_submit: false,
+                            mode: TextInputMode::SingleLine,
+                            focus_on_pointer_down: true,
+                            unfocus_on_submit: true,
+                            max_chars: Some(32),
+                            ..default()
+                        },
+                        MotherPokemonInput,
+                        button_text_style.clone(),
+                    ));
+
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new("Result:"),
+                        Pickable::IGNORE,
+                    ));
+                    builder.spawn((
+                        button_text_style.clone(),
+                        Text::new(""),
+                        Pickable::IGNORE,
+                        ResultLabel,
+                    ));
+                    builder
+                        .spawn((
+                            Button,
+                            button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
+                            children![(
+                                button_text_style.clone(),
+                                Text::new("Submit"),
+                                Pickable::IGNORE
+                            ),],
+                        ))
+                        .observe(search_submit_button);
+
+                    builder
+                        .spawn((
+                            Button,
+                            button_node.clone(),
+                            BackgroundColor(BUTTON_COLOR),
+                            children![(button_text_style, Text::new("Back"), Pickable::IGNORE),],
+                        ))
+                        .observe(change_state_on_click(
+                            PointerButton::Primary,
+                            MenuState::Main,
+                        ));
                 });
         });
 }
@@ -240,7 +455,7 @@ fn quit_game_on_click(
     }
 }
 
-fn submit_button(
+fn breed_submit_button(
     mut click: Trigger<Pointer<Click>>,
     mother: Query<&TextInputContents, With<MotherPokemonInput>>,
     other: Query<&TextInputContents, With<OtherPokemonInput>>,
@@ -312,6 +527,28 @@ fn submit_button(
     }
 }
 
+fn search_submit_button(
+    mut click: Trigger<Pointer<Click>>,
+    mother: Query<&TextInputContents, With<MotherPokemonInput>>,
+    mut result: Query<&mut Text, With<ResultLabel>>,
+    db: NonSend<Database>,
+) {
+    click.propagate(false);
+
+    if click.button == PointerButton::Primary {
+        let mother = mother.single().unwrap().get();
+
+        let mut result = result.single_mut().unwrap();
+
+        result.0 = if !exists(&db, mother) {
+            "Not Found".into()
+        } else {
+            let compatible = get_pokemon_compatible(&db, mother);
+
+            format!("Breedable: {}", compatible.join(", "))
+        };
+    }
+}
 fn exists(db: &Database, name: &str) -> bool {
     let query = r#"
             SELECT COUNT(*)
@@ -349,6 +586,7 @@ fn get_egg_moves(db: &Database, name: &str) -> Vec<String> {
                 JOIN pokemon_move ON pokemon.pokemon_id = pokemon_move.pokemon_id
                 JOIN move ON pokemon_move.move_id = move.move_id
             WHERE pokemon.name = :pokemon_name
+              AND pokemon_move.method = 'egg'
             COLLATE NOCASE
     "#;
     let mut query = db.connection.prepare_cached(query).unwrap();
@@ -358,4 +596,43 @@ fn get_egg_moves(db: &Database, name: &str) -> Vec<String> {
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap()
+}
+
+fn get_pokemon_compatible(db: &Database, name: &str) -> Vec<String> {
+    let query = r#"
+        SELECT pokemon.name
+            FROM pokemon
+                JOIN pokemon_egg_group ON pokemon.pokemon_id = pokemon_egg_group.pokemon_id
+                JOIN egg_group ON pokemon_egg_group.egg_group_id = egg_group.egg_group_id
+                JOIN (
+                    SELECT eg.egg_group_id AS id
+                        FROM pokemon as pk
+                            JOIN pokemon_egg_group peg ON pk.pokemon_id = peg.pokemon_id
+                            JOIN egg_group eg ON peg.egg_group_id = eg.egg_group_id
+                        WHERE pk.name = :pokemon_name
+                        COLLATE NOCASE
+                ) AS breedable ON egg_group.egg_group_id = breedable.id
+            GROUP BY pokemon.pokemon_id
+    "#;
+    let mut query = db.connection.prepare_cached(query).unwrap();
+
+    query
+        .query_map((name,), |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+pub fn change_state_on_click<State: FreelyMutableState + Clone>(
+    click: PointerButton,
+    state: State,
+) -> impl Fn(Trigger<Pointer<Click>>, ResMut<NextState<State>>) {
+    move |mut event, mut next_state| {
+        if event.button != click {
+            return;
+        }
+
+        next_state.set(state.clone());
+        event.propagate(false);
+    }
 }
