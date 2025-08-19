@@ -301,13 +301,13 @@ fn submit_button(
 
             let egg_moves = get_egg_moves(&db, pokemon);
 
-            let msg = if egg_moves.len() > 0 {
+            let egg_moves = if egg_moves.len() > 0 {
                 egg_moves.join(", ")
             } else {
-                "No Egg Moves".into()
+                "None".into()
             };
 
-            result.0 = format!("{pokemon}\n{msg}");
+            result.0 = format!("{pokemon}\nEgg Moves: {egg_moves}");
         };
     }
 }
@@ -317,6 +317,7 @@ fn exists(db: &Database, name: &str) -> bool {
             SELECT COUNT(*)
                 FROM pokemon
                 WHERE pokemon.name = :name
+                COLLATE NOCASE
         "#;
     let mut query = db.connection.prepare_cached(query).unwrap();
 
@@ -329,7 +330,8 @@ fn get_groups(db: &Database, name: &str) -> Vec<String> {
                 FROM pokemon
                     JOIN pokemon_egg_group ON pokemon.pokemon_id = pokemon_egg_group.pokemon_id
                     JOIN egg_group ON pokemon_egg_group.egg_group_id = egg_group.egg_group_id
-                WHERE pokemon.name = :pokemon_name;
+                WHERE pokemon.name = :pokemon_name
+                COLLATE NOCASE
         "#;
     let mut query = db.connection.prepare_cached(query).unwrap();
 
@@ -347,6 +349,7 @@ fn get_egg_moves(db: &Database, name: &str) -> Vec<String> {
                 JOIN pokemon_move ON pokemon.pokemon_id = pokemon_move.pokemon_id
                 JOIN move ON pokemon_move.move_id = move.move_id
             WHERE pokemon.name = :pokemon_name
+            COLLATE NOCASE
     "#;
     let mut query = db.connection.prepare_cached(query).unwrap();
 
