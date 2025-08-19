@@ -7,6 +7,7 @@ use bevy::state::state::FreelyMutableState;
 use bevy_ui_text_input::{TextInputContents, TextInputMode, TextInputNode};
 
 const DEFAULT_FONT_PATH: &str = "embedded://assets/fonts/Ithaca/Ithaca-LVB75.ttf";
+const TITLE_PATH: &str = "embedded://assets/title.png";
 const TEXT_COLOR: Color = Color::srgb_u8(0xFF, 0xFF, 0xFF);
 const TEXT_INPUT_COLOR: Color = Color::srgb_u8(0x33, 0x55, 0x33);
 const BUTTON_COLOR: Color = Color::srgb_u8(0x33, 0x55, 0x77);
@@ -18,6 +19,7 @@ pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         embed_asset!(app, "assets/fonts/Ithaca/Ithaca-LVB75.ttf");
+        embed_asset!(app, "assets/title.png");
 
         app.init_state::<MenuState>();
         app.add_plugins(bevy_ui_text_input::TextInputPlugin);
@@ -90,7 +92,7 @@ struct OtherPokemonInfo;
 #[derive(Component)]
 struct ResultLabel;
 
-fn main_enter(mut commands: Commands, font: Res<GameFont>) {
+fn main_enter(mut commands: Commands, font: Res<GameFont>, asset_server: ResMut<AssetServer>) {
     let button_node = Node {
         width: Val::Px(300.0),
         height: Val::Px(65.0),
@@ -131,7 +133,10 @@ fn main_enter(mut commands: Commands, font: Res<GameFont>) {
                 .with_children(|builder| {
                     builder.spawn((
                         button_text_style.clone(),
-                        Text::new("Pokemon Database"),
+                        ImageNode {
+                            image: asset_server.load(TITLE_PATH),
+                            ..default()
+                        },
                         Pickable::IGNORE,
                     ));
 
@@ -494,7 +499,12 @@ fn breed_submit_button(
         mother_info.0 = if !exists(&db, mother) {
             "Not Found".into()
         } else {
-            format!("Egg Groups: {}", mother_groups.join(", "))
+            let str = if mother_groups.len() > 0 {
+                mother_groups.join(", ")
+            } else {
+                "None".into()
+            };
+            format!("Egg Groups: {}", str)
         };
 
         let mut other_info = other_info.single_mut().unwrap();
@@ -502,7 +512,12 @@ fn breed_submit_button(
         other_info.0 = if !exists(&db, other) {
             "Not Found".into()
         } else {
-            format!("Egg Groups: {}", other_groups.join(", "))
+            let str = if other_groups.len() > 0 {
+                other_groups.join(", ")
+            } else {
+                "None".into()
+            };
+            format!("Egg Groups: {}", str)
         };
 
         let any_overlap = mother_groups
