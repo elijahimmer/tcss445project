@@ -1,17 +1,47 @@
+use crate::embed_asset;
 use crate::prelude::*;
+
+use bevy_ui_text_input::{TextInputContents, TextInputFilter, TextInputMode, TextInputNode};
+
+const DEFAULT_FONT_PATH: &str = "embedded://assets/fonts/Ithaca/Ithaca-LVB75.ttf";
+const TEXT_COLOR: Color = Color::srgb_u8(0xFF, 0xFF, 0xFF);
 
 pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
+        embed_asset!(app, "assets/fonts/Ithaca/Ithaca-LVB75.ttf");
+
         app.init_state::<MenuState>();
 
         #[cfg(feature = "debug")]
         app.add_systems(Update, log_transitions::<MenuState>);
 
-        app.add_systems(Update, button_highlight)
-            .add_systems(OnEnter(MenuState::Main), main_enter);
+        app.add_systems(
+            OnEnter(MenuState::Main),
+            ((load_font, camera_setup), main_enter).chain(),
+        )
+        .add_systems(Update, button_highlight);
     }
+}
+
+#[derive(Resource)]
+pub struct GameFont(pub Handle<Font>);
+
+fn load_font(mut commands: Commands, asset_server: ResMut<AssetServer>) {
+    commands.insert_resource(GameFont(asset_server.load(DEFAULT_FONT_PATH)));
+}
+
+fn camera_setup(mut commands: Commands) {
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::render::camera::ScalingMode::WindowSize,
+            scale: CAMERA_DEFAULT_SCALE,
+            ..OrthographicProjection::default_2d()
+        }),
+        Transform::IDENTITY,
+    ));
 }
 
 #[derive(States, Clone, Copy, Default, Eq, PartialEq, Debug, Hash)]
@@ -25,7 +55,7 @@ pub enum MenuState {
 #[derive(Component)]
 struct SelectedOption;
 
-fn main_enter(mut commands: Commands) {
+fn main_enter(mut commands: Commands, font: Res<GameFont>) {
     // Common style for all buttons on the screen
     let button_node = Node {
         width: Val::Px(300.0),
@@ -35,6 +65,16 @@ fn main_enter(mut commands: Commands) {
         align_items: AlignItems::Center,
         ..default()
     };
+
+    let button_text_style = (
+        TextFont {
+            font: font.0.clone(),
+            font_size: 33.0,
+            ..default()
+        },
+        TextColor(TEXT_COLOR),
+        TextLayout::new_with_justify(JustifyText::Center),
+    );
 
     commands
         .spawn((
@@ -55,11 +95,30 @@ fn main_enter(mut commands: Commands) {
                     ..default()
                 })
                 .with_children(|builder| {
+                    builder.spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        TextInputContents::default(),
+                        TextInputNode {
+                            clear_on_submit: false,
+                            mode: TextInputMode::SingleLine,
+                            focus_on_pointer_down: true,
+                            unfocus_on_submit: true,
+                            max_chars: Some(16),
+                            filter: Some(TextInputFilter::Hex),
+                            ..default()
+                        },
+                        button_text_style.clone(),
+                    ));
+
                     builder
                         .spawn((
                             Button,
                             button_node.clone(),
-                            children![(Text::new("Quit"), Pickable::IGNORE),],
+                            children![(button_text_style, Text::new("Quit"), Pickable::IGNORE),],
                         ))
                         .observe(quit_game_on_click);
                 });

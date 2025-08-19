@@ -13,6 +13,20 @@ pub mod prelude {
 
 use prelude::*;
 
+#[macro_export]
+macro_rules! embed_asset {
+    ($app: ident, $path: expr) => {{
+        let embedded = $app
+            .world_mut()
+            .resource_mut::<::bevy::asset::io::embedded::EmbeddedAssetRegistry>();
+
+        embedded.insert_asset(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/", $path).into(),
+            ::std::path::Path::new($path),
+            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path)),
+        );
+    }};
+}
 fn main() {
     let mut app = App::new();
 
