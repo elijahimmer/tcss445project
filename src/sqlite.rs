@@ -12,14 +12,14 @@ const ADD_SCHEMA: &str = "
 
     CREATE TABLE pokemon(
       pokemon_id     INTEGER PRIMARY KEY CHECK(pokemon_id > 0),
-      name           TEXT NOT NULL UNIQUE,
+      name           TEXT NOT NULL UNIQUE COLLATE NOCASE,
       primary_type   TEXT NOT NULL DEFAULT 'Normal',
       secondary_type TEXT DEFAULT NULL
     ) STRICT;
 
     CREATE TABLE egg_group(
       egg_group_id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(egg_group_id > 0),
-      name         TEXT NOT NULL UNIQUE
+      name         TEXT NOT NULL UNIQUE COLLATE NOCASE
     ) STRICT;
 
     CREATE TABLE pokemon_egg_group(
@@ -32,7 +32,7 @@ const ADD_SCHEMA: &str = "
 
     CREATE TABLE move(
       move_id  INTEGER PRIMARY KEY CHECK(move_id > 0),
-      name     TEXT NOT NULL UNIQUE,
+      name     TEXT NOT NULL UNIQUE COLLATE NOCASE,
       type     TEXT NOT NULL DEFAULT 'Normal',
       category TEXT NOT NULL CHECK(category in ('Status', 'Physical', 'Special')) DEFAULT 'Physical',
       power    INTEGER CHECK(power > 0 OR power IS NULL) DEFAULT NULL,
