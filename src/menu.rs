@@ -560,7 +560,14 @@ fn search_submit_button(
         } else {
             let compatible = get_pokemon_compatible(&db, mother);
 
-            format!("Breedable: {}", compatible.join(", "))
+            format!(
+                "Breedable: {}",
+                if compatible.len() > 0 {
+                    compatible.join(", ")
+                } else {
+                    "None".into()
+                }
+            )
         };
     }
 }
